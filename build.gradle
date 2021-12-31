@@ -1,0 +1,133 @@
+plugins {
+    id "maven-publish"
+    id "com.jfrog.bintray" version "1.7.3"
+
+    id 'jacoco'
+    id "com.github.kt3k.coveralls" version "2.8.2"
+
+    id "org.sonarqube" version "2.6.1"
+
+    id "org.jetbrains.kotlin.jvm" version "1.2.41"
+}
+
+repositories {
+    mavenLocal()
+    mavenCentral()
+    jcenter()
+}
+
+dependencies {
+    compile "org.jetbrains.kotlin:kotlin-stdlib-jdk8"
+
+    compile "org.apache.poi:poi:$poi"
+    compile "org.apache.poi:poi-ooxml:$poi"
+
+    testCompile "junit:junit:$junit"
+    testCompile "org.hamcrest:hamcrest-library:$hamcrest"
+}
+
+sourceSets {
+    main.kotlin.srcDirs += 'src/main/java'
+    main.java.srcDirs += 'src/main/java'
+}
+
+tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile).all {
+    kotlinOptions.jvmTarget = "1.8"
+}
+
+// Testing
+jacocoTestReport {
+    reports {
+        xml.enabled = true // coveralls plugin depends on xml format report
+        html.enabled = true
+    }
+}
+
+// Publishing
+version = '0.0.1'
+def projectName = 'KExcelAPI'
+def repoGroupId = 'com.github.thleu'
+def repoArtifactId = 'kexcelapi'
+def repoUrl = 'https://github.com/thleu'
+def repoUserOrg = 'thleu'
+
+task sourcesJar(type: Jar, dependsOn: classes) {
+    classifier = 'sources'
+    from sourceSets.main.allSource
+}
+
+javadoc.failOnError = false
+task javadocJar(type: Jar, dependsOn: javadoc) {
+    classifier = 'javadoc'
+    from javadoc.destinationDir
+}
+
+artifacts {
+    archives sourcesJar
+    archives javadocJar
+}
+
+def pomConfig = {
+    licenses {
+        license {
+            name "MIT License"
+            url "http://www.opensource.org/licenses/mit-license.php"
+            distribution "repo"
+        }
+    }
+    developers {
+        developer {
+            id "ThLeu"
+            name "Thomas Leu"
+            email "thomas.leu@gmail.com"
+            url "$repoUrl"
+        }
+    }
+
+    scm {
+        url "${repoUrl}/${projectName}"
+    }
+}
+
+publishing {
+    publications {
+        mavenPublication(MavenPublication) {
+            from components.java
+            artifact sourcesJar {
+                classifier "sources"
+            }
+            artifact javadocJar {
+                classifier "javadoc"
+            }
+            groupId = "$repoGroupId"
+            artifactId = "$repoArtifactId"
+            version "$version"
+            pom.withXml {
+                def root = asNode()
+                root.appendNode('description', 'An Excel API written in Kotlin built on top of Apache POI')
+                root.appendNode('name', "$projectName")
+                root.appendNode('url', "${repoUrl}/${projectName}")
+                root.children().last() + pomConfig
+            }
+        }
+    }
+}
+
+bintray {
+    user = System.getProperty('bintray.user')
+    key = System.getProperty('bintray.key')
+    publications = ['mavenPublication']
+
+    pkg {
+        repo = "$projectName"
+        name = "$projectName"
+        userOrg = "$repoUserOrg"
+        licenses = ['MIT']
+        vcsUrl = "${repoUrl}/${projectName}.git"
+        version {
+            name = "$version"
+            desc = "$version"
+            released  = new Date()
+        }
+    }
+}
